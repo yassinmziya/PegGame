@@ -1,4 +1,5 @@
 from tkinter import *
+from math import trunc
 
 GAME_WIDTH = 600.0
 GAME_HEIGHT = 600.0
@@ -14,8 +15,8 @@ class Application:
         self.window.title('Peg Game')
         self.window.resizable(False, False)
 
-        label = Label(self.window, text= 'Hello, Yassin!', font= ('Arial', 40))
-        label.pack()
+        self.label = Label(self.window, text= 'Hello, Yassin!', font= ('Arial', 40))
+        self.pack()
 
         # setup canvas
         self.canvas = Canvas(self.window, width= GAME_WIDTH, height= GAME_HEIGHT, bg= BACKGROUND_COLOR)
@@ -26,41 +27,63 @@ class Application:
         self.window.mainloop()
 
 class Board:
+
+    # SETUP
+
     def __init__(self, canvas):
-        # 2 => Draw a peg on canvas
-        # 1 => Draw empty hole on canvas
+        # 1 => Draw a peg on canvas
+        # -1 => Draw empty hole on canvas
         # 0 => Do not draw anything on cavas
         self.canvas = canvas
-        self.board = [
-            [0, 0, 0, 1, 0, 0, 0],
-            [0, 0, 2, 0, 2, 0, 0],
-            [0, 2, 0, 2, 0, 2, 0],
-            [2, 0, 2, 0, 2, 0, 2],
+        self.model = [
+            [0, 0, -1, 0, 0],
+            [0, 1, 0, 1, 0],
+            [1, 0, 1, 0, 1],
         ]
         self.draw_board()
         self.setup_interactions()
     
     def draw_board(self):
-        for y in range(len(self.board)):
-            row = self.board[y]
+        for y in range(len(self.model)):
+            row = self.model[y]
             for x in range (len(row)):
-                column_width = GAME_WIDTH/len(row)
-                column_height = GAME_HEIGHT/len(self.board)
-                x0 = x * column_width + (column_width - HOLE_RADIUS)/2
-                y0 = y * column_height+ (column_height- HOLE_RADIUS)/2
-                x1 = x0 + HOLE_RADIUS
-                y1 = y0 + HOLE_RADIUS
-                if row[x] == 2:
-                    self.canvas.create_oval(x0, y0, x1, y1, fill=PEG_COLOR)
-                elif row[x] == 1:
-                    self.canvas.create_oval(x0, y0, x1, y1, fill=HOLE_COLOR)
-    
+                if not (self.model[y][x] == 0):
+                    self.draw_circle(x, y, self.model[y][x] == -1)
+
     def setup_interactions(self):
         self.canvas.bind('<Button>', self.did_click_canvas)
 
+    # HELPERS
+
     def did_click_canvas(self, event):
-        print('(yassini)', event.x, event.y)
-        # convert event coordinates to self.board index
+        num_rows = len(self.model[0])
+        num_cols = len(self.model)
+        column_width = GAME_WIDTH/num_rows
+        column_height = GAME_HEIGHT/num_cols
+        x =  trunc(event.x * num_rows / GAME_WIDTH)
+        y = trunc(event.y * num_cols / GAME_HEIGHT)
+        self.toggle_peg(x, y)
+                
+    
+    def draw_circle(self, x, y, is_empty):
+        column_width = GAME_WIDTH/len(self.model[0])
+        column_height = GAME_HEIGHT/len(self.model)
+        x0 = x * column_width + (column_width - HOLE_RADIUS)/2
+        y0 = y * column_height + (column_height- HOLE_RADIUS)/2
+        x1 = x0 + HOLE_RADIUS
+        y1 = y0 + HOLE_RADIUS
+        if is_empty:
+            self.canvas.create_oval(x0, y0, x1, y1, fill=HOLE_COLOR)
+        else:
+            self.canvas.create_oval(x0, y0, x1, y1, fill=PEG_COLOR)
+
+
+    def toggle_peg(self, x, y):
+        if self.model[y][x] == 0:
+            return
+        self.model[y][x] *= -1
+        self.draw_circle(x, y, self.model[y][x] == - 1)
+
 
 
 if __name__ == '__main__':
