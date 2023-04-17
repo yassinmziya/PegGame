@@ -16,7 +16,7 @@ class Application:
         self.window.title('Peg Game')
         self.window.resizable(False, False)
 
-        self.label = Label(self.window, text= 'Hello, Yassin!', font= ('Arial', 40))
+        self.label = Label(self.window, text= 'Pegging Game', font= ('Arial', 40))
         self.label.pack()
 
         # setup canvas
@@ -38,9 +38,11 @@ class Board:
         # 0 => Do not draw anything on cavas
         self.canvas = canvas
         self.model = [
-            [0, 0, -1, 0, 0],
-            [0, 1, 0, 1, 0],
-            [1, 0, 1, 0, 1],
+            [0, 0, 0, 0, -1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 1, 0, 1, 0, 0],
+            [0, 1, 0, 1, 0, 1, 0, 1, 0],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1]
         ]
         self.selected_peg = None
 
@@ -66,10 +68,17 @@ class Board:
         column_height = GAME_HEIGHT/num_cols
         x =  trunc(event.x * num_rows / GAME_WIDTH)
         y = trunc(event.y * num_cols / GAME_HEIGHT)
+        # print(x, y)
         if self.selected_peg == None:
             # if not peg is selected, select (x,y) and highlight
             self.select_peg(x, y)
         else:
+            # @ SALUM
+            if (x == self.selected_peg[0]) and (y == self.selected_peg[1]):
+                self.selected_peg = None
+                self.model[y][x] = 1
+                self.draw_circle(x, y)
+                return
             # select a hole to fill (pause) with the selected peg
             self.fill_hole(x, y)
                 
@@ -89,20 +98,57 @@ class Board:
             self.canvas.create_oval(x0, y0, x1, y1, fill=SELECTED_PEG_COLOR)
 
     # Selects peg (x, y) and updates model
-    def select_peg(self, x, y):
-        if self.model[y][x] != 1:
+    def select_peg(self, peg_x, peg_y):
+        if self.model[peg_y][peg_x] != 1:
             return
-        self.model[y][x] = 2
-        self.selected_peg = [x, y]
-        self.draw_circle(x, y)
+        self.model[peg_y][peg_x] = 2
+        self.selected_peg = [peg_x, peg_y]
+        self.draw_circle(peg_x, peg_y)
         
 
     # Fills hole (x, y) with the selcted peg and updates model
-    def fill_hole(self, x, y):
-        if self.model[y][x] != -1:
+    def fill_hole(self, hole_x, hole_y):
+        # Is the move legal?
+        if not self.is_valid_move(hole_x, hole_y):
+            print("Move is invalid my boi!")
             return 
-        # TODO
+        
+        # Fill the hole
+        self.model[hole_y][hole_x] = 1
+        self.draw_circle(hole_x, hole_y)
 
+        # @ SALUM: Remove the peg we just skipped over
+        selected_x = self.selected_peg[0]
+        selected_y = self.selected_peg[1]
+        skipped_peg_x = trunc((hole_x + selected_x) / 2)
+        skipped_peg_y = trunc((hole_y + selected_y) / 2)
+        self.model[skipped_peg_y][skipped_peg_x] = -1
+        self.draw_circle(skipped_peg_x, skipped_peg_y)
+
+
+        # Clear the old selected peg
+        self.model[self.selected_peg[1]][self.selected_peg[0]] = -1
+        self.draw_circle(self.selected_peg[0], self.selected_peg[1])
+        self.selected_peg = None
+
+    # @ SALUM
+    # Returns True only if move from selected peg to given (x, y) is valid. False otherwise
+    def is_valid_move(self, hole_x, hole_y):
+        # Do we have a peg selected?
+        if self.select_peg == None:
+            print('selected peg is None')
+            return False
+        
+        # Is our destination a hole?
+        if self.model[hole_y][hole_x] != -1:
+            print('not a hole')
+            return False
+        
+        # Is our destination within 2
+        selected_x = self.selected_peg[0]
+        selected_y = self.selected_peg[1]
+        return abs(selected_x - hole_x) == 2 and abs(selected_y - hole_y) == 2
+        
 
 
 if __name__ == '__main__':
