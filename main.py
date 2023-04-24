@@ -1,5 +1,6 @@
 from tkinter import *
 from math import trunc
+import time
 
 GAME_WIDTH = 600.0
 GAME_HEIGHT = 600.0
@@ -8,8 +9,9 @@ SELECTED_PEG_COLOR = 'yellow'
 PEG_COLOR = 'red'
 HOLE_COLOR = 'black'
 BACKGROUND_COLOR = '#f5f5f4'
+SOLUTION_TERMINATOR = '******************\n'
 
-class Application:
+class Game:
     def __init__(self):
         # setup window
         self.window = Tk()
@@ -23,9 +25,55 @@ class Application:
         self.canvas = Canvas(self.window, width= GAME_WIDTH, height= GAME_HEIGHT, bg= BACKGROUND_COLOR)
         self.canvas.pack()
 
+        # soutions
+        self.solutionParser = SolutionParser()
+        self.solutionIndex = 0
+        self.stepIndex = 0
+
     def start(self):
-        board = Board(self.canvas)
+        self.board = Board(self.canvas)
         self.window.mainloop()
+
+    def start_automated(self):
+        self.board = Board(self.canvas)
+        self.window.after(2000, self.automate_solution)
+        self.window.mainloop()
+
+    def automate_solution(self):
+        if (self.solutionIndex > len(self.solutionParser.solutions) - 1):
+            print('QED')
+            return
+       
+        solution = self.solutionParser.solutions[self.solutionIndex]
+
+        if (self.stepIndex > len(solution) - 1):
+            print('RESET')
+            self.stepIndex = 0
+            self.solutionIndex += 1
+            self.reset()
+            self.window.after(2000, self.automate_solution)
+            return
+
+        move = solution[self.stepIndex]
+        peg = self.offset_move(move[0])
+        hole = self.offset_move(move[1])
+        self.board.select_peg(peg[0] , peg[1])
+        self.board.fill_hole(hole[0], hole[1])
+        
+        self.stepIndex += 1
+        self.window.after(2000, self.automate_solution)
+
+    def offset_move(self, move):
+        x = move[0]
+        y = move[1]
+        x_offset = (len(self.board.model) - y -1)
+        return [x_offset + 2 * x, y]
+
+    def reset(self):
+        self.canvas.delete('all')
+        self.board = Board(self.canvas)
+        
+
 
 class Board:
 
@@ -73,7 +121,7 @@ class Board:
             # if not peg is selected, select (x,y) and highlight
             self.select_peg(x, y)
         else:
-            # @ SALUM
+            # Check that if selecting same coordinate, we deselect
             if (x == self.selected_peg[0]) and (y == self.selected_peg[1]):
                 self.selected_peg = None
                 self.model[y][x] = 1
@@ -81,6 +129,8 @@ class Board:
                 return
             # select a hole to fill (pause) with the selected peg
             self.fill_hole(x, y)
+
+
                 
     # Draws a circle at (x, y) representing the value of model[y][x]
     def draw_circle(self, x, y):
@@ -110,14 +160,13 @@ class Board:
     def fill_hole(self, hole_x, hole_y):
         # Is the move legal?
         if not self.is_valid_move(hole_x, hole_y):
-            print("Move is invalid my boi!")
             return 
         
         # Fill the hole
         self.model[hole_y][hole_x] = 1
         self.draw_circle(hole_x, hole_y)
 
-        # @ SALUM: Remove the peg we just skipped over
+        # Remove the peg we just skipped over
         selected_x = self.selected_peg[0]
         selected_y = self.selected_peg[1]
         skipped_peg_x = trunc((hole_x + selected_x) / 2)
@@ -125,32 +174,69 @@ class Board:
         self.model[skipped_peg_y][skipped_peg_x] = -1
         self.draw_circle(skipped_peg_x, skipped_peg_y)
 
-
         # Clear the old selected peg
         self.model[self.selected_peg[1]][self.selected_peg[0]] = -1
         self.draw_circle(self.selected_peg[0], self.selected_peg[1])
         self.selected_peg = None
 
-    # @ SALUM
     # Returns True only if move from selected peg to given (x, y) is valid. False otherwise
     def is_valid_move(self, hole_x, hole_y):
         # Do we have a peg selected?
         if self.select_peg == None:
-            print('selected peg is None')
+            print("Move is invalid. No peg selected")
             return False
         
         # Is our destination a hole?
         if self.model[hole_y][hole_x] != -1:
-            print('not a hole')
+            print("Move is invalid. Destination is not a hole:", hole_x, hole_y)
             return False
         
         # Is our destination within 2
         selected_x = self.selected_peg[0]
         selected_y = self.selected_peg[1]
-        return abs(selected_x - hole_x) == 2 and abs(selected_y - hole_y) == 2
         
+        # Check is valid, general case
+        result = abs(selected_x - hole_x) == 2 and abs(selected_y - hole_y) == 2 
+
+        # Same row move?
+        if not result:
+            result = abs(selected_x - hole_x) == 4 and (selected_y == hole_y)
+        
+        if not result:
+            print("Move is invalid. Destination is too far away:", hole_x, hole_y)
+
+        return result
+        
+class SolutionParser:
+
+    def __init__(self, fileName='Game Solutions.txt'):
+        self.solutions = []
+        with open(fileName, 'r') as f:
+            line = f.readline()
+            # Saves Solution n as array format [[from, to], [from, to] ...]
+            moves = []
+            while line:
+                if line == SOLUTION_TERMINATOR:
+                    self.solutions.append(moves)
+                    moves = []
+                    line = f.readline()
+                move = self.parse_string_for_moves(line)
+                if move != None:
+                    moves.append(move)
+                line = f.readline()
+            f.close()
+    
+    # Returns [from, to] for line s only if of format `Move: (From:[2,2], To:[4,2])`. Otherwise
+    # returns None
+    def parse_string_for_moves(self, s):
+        if s[0:5] != 'Move:':
+            return None
+        return [[int(s[15]), int(s[13])], [int(s[25]), int(s[23])]]
 
 
 if __name__ == '__main__':
-    app = Application()
-    app.start()
+    app = Game()
+    app.start_automated()
+
+# Extensions
+# Make it so that if a peg already selected, clicking another peg will select it
